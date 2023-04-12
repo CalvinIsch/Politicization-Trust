@@ -17,6 +17,7 @@ df <- read.csv('Study 1 anon.csv')
 How do average levels of politicization and slant (perceptions) associate with trust?
 
 ```{r}
+# Rename some variables for consistency
 names(df)[names(df) == 'Slant_K12'] <- 'slant_K12'
 names(df)[names(df) == 'Polit_K12'] <- 'polit_K12'
 names(df)[names(df) == 'Slant_Cong'] <- 'slant_Cong'
@@ -40,7 +41,7 @@ for (g in all_groups){
 }
 df_means <- data.frame(all_groups,trust,slant,polit)
 
-a2 <- ggplot(df_means, aes(x=slant, y = trust)) + 
+a <- ggplot(df_means, aes(x=slant, y = trust)) + 
   geom_point() + geom_smooth(method=glm) + 
   ylab('Mean Org. Trust') + xlab('Mean Org. Slant') + 
   theme(axis.text=element_text(size=15), 
@@ -52,7 +53,7 @@ a2 <- ggplot(df_means, aes(x=slant, y = trust)) +
         panel.border = element_rect(colour = "black", fill=NA, size=1))+
   coord_cartesian(xlim = c(20,80), ylim = c(1.5,5.0))
 
-b2 <- ggplot(df_means, aes(x=polit, y = trust)) + 
+b <- ggplot(df_means, aes(x=polit, y = trust)) + 
   geom_point() + geom_smooth(method=glm) + 
   ylab('Mean Org. Trust') + xlab('Mean Org. Politicization') + 
   theme(axis.text=element_text(size=15), 
@@ -65,7 +66,7 @@ b2 <- ggplot(df_means, aes(x=polit, y = trust)) +
         panel.border = element_rect(colour = "black", fill=NA, size=1))+
   coord_cartesian(xlim = c(1,6), ylim = c(1.5,5.0))
 
-ggarrange(a2, b2, labels = c("", ""),ncol = 2, nrow = 1, widths=c(1,0.93))
+ggarrange(a, b, labels = c("", ""),ncol = 2, nrow = 1, widths=c(1,0.93))
 ggsave("plots/Figure1-Mean-slant-polit-trust.png",width = 8,height = 4,units = "in",dpi = 300)
 
 cor.test(df_means$slant,df_means$trust,method='pearson',conf.level=0.95)
@@ -162,39 +163,44 @@ plot_congruence <- function(data, group,include_y,xlab_use,include_legend){
 }
 
 a1 = plot_congruence(df, "vet",T,"Vets",F)
-a2 = plot_congruence(df, "police",F,"Police",F)
-a3 = plot_congruence(df, "prof",F,"Professors",T)
+a2 = plot_congruence(df, "police",F,"Police",T) # Depending on order of column either 2 or 3 ends with 'T'
+a3 = plot_congruence(df, "prof",F,"Professors",F)
 b1 = plot_congruence(df, "toll",T,"Toll Booth",F)
-b2 = plot_congruence(df, "SC",F,"Supreme Court",F)
-b3 = plot_congruence(df, "WHO",F,"WHO",T)
+b2 = plot_congruence(df, "SC",F,"Supreme Court",T)
+b3 = plot_congruence(df, "WHO",F,"WHO",F)
 c1 = plot_congruence(df, "chefs",T,"Chefs",F)
-c2 = plot_congruence(df, "church",F,"Church",F)
-c3 = plot_congruence(df, "PETA",F,"PETA",T)
+c2 = plot_congruence(df, "church",F,"Church",T)
+c3 = plot_congruence(df, "PETA",F,"PETA",F)
 
-ggarrange(a1, a2, a3, b1, b2, b3, c1, c2, c3, labels = c("", "", "","", "", "","", "", ""),ncol = 3, nrow = 3, widths=c(0.85,0.78,1.15))
-ggsave("plots/Figure3-Congrencextrust-politicization.png",width = 10,height = 10.5,units = "in",dpi = 300)
+# Order for center, right, left (columns)
+#ggarrange(a1, a2, a3, b1, b2, b3, c1, c2, c3, labels = c("", "", "","", "", "","", "", ""),ncol = 3, nrow = 3, widths=c(0.85,0.78,1.15))
+#ggsave("plots/Figure3-Congrencextrust-politicization.png",width = 10,height = 10.5,units = "in",dpi = 300)
+
+# Order for left, center, right (columns)
+ggarrange(a3, a1, a2, b3, b1, b2, c3, c1, c2, labels = c("", "", "","", "", "","", "", ""),ncol = 3, nrow = 3, widths=c(0.85,0.78,1.15))
+ggsave("plots/Figure3-Congrencextrust-politicizationb.png",width = 10,height = 10.5,units = "in",dpi = 300)
+
+```
+
+# Figure 3b (Appendix)
+Another figure with significant interactions for 3 other groups
+
+```{r}
+a1 = plot_congruence(df, "econ",T,"Economists",F)
+b1 = plot_congruence(df, "holly",F,"Hollywood",F)
+c1 = plot_congruence(df, "think",F,"Think Tanks",T)
+
+ggarrange(a1, b1, c1, labels = c("", "", ""),ncol = 3, nrow = 1, widths=c(0.85,0.78,1.15))
+ggsave("plots/Figure3b-Congrencextrust-politicization.png",width = 10,height = 3.5,units = "in",dpi = 300)
 
 ```
 
 # Figure 4
-Now we only want to look at the orgs with statistically significant 3-way interactions
-
-```{r}
-a1_1 = plot_congruence(df, "econ",T,"Economists",F)
-b1_1 = plot_congruence(df, "holly",F,"Hollywood",F)
-c1_1 = plot_congruence(df, "think",F,"Think Tanks",T)
-
-ggarrange(a1_1, b1_1, c1_1, labels = c("", "", ""),ncol = 3, nrow = 1, widths=c(0.85,0.78,1.15))
-ggsave("plots/Figure4-Congrencextrust-politicization.png",width = 10,height = 3.5,units = "in",dpi = 300)
-
-```
-
-# Figure 5
 Here, we need to load the data from study 2:
 ```{r}
 library(readxl)
 df_2 <- read_excel('Study 2 anon.xlsx')
-
+# Rename a few columns for consistency
 names(df_2)[names(df_2) == 'TrustWHO'] <- 'TrustWho'
 names(df_2)[names(df_2) == 'TrustFIRE'] <- 'TrustFire'
 names(df_2)[names(df_2) == 'SupportWHO'] <- 'SupportWho'
@@ -225,9 +231,18 @@ plot_congruence_2 <- function(data, group,include_y,xlab_use,include_legend,trus
     drop_na() %>%
     mutate(Congruence = factor(Congruence, levels = c("Incongruent","Neutral", "Congruent")))
   
+    if (group == "Fire" | group == 'Doc'){
+      print(nrow(df_reg %>% filter(Congruence == 'Incongruent')))
+      print(nrow(df_reg %>% filter(Congruence == 'Neutral')))
+      print(nrow(df_reg %>% filter(Congruence == 'Congruent')))
+      #df_reg <- df_reg %>% filter(Congruence == 'Neutral') 
+    }
+  
   a <- ggplot(df_reg, aes(x=get(paste0("Polit",group)), y = get(paste0(ifelse(trust, "Trust", "Support"),group)), color = Congruence)) + 
     geom_point(alpha = 0.5, size =0.5) + geom_jitter(height = 0.5,width = 0.5,alpha = 0.5, size =0.5) + geom_smooth(method=glm,aes(fill=Congruence)) + 
-    scale_color_manual(values=c('#FF5733','#d4af37',"#007200"))+ scale_fill_manual(values=c('#FF5733','#d4af37',"#007200"))+
+    ylim(0.5, 6.2) +
+    scale_color_manual(values=c('Incongruent' = '#FF5733','Neutral' = '#d4af37','Congruent' = "#007200"),drop=FALSE)+
+    scale_fill_manual(values=c('Incongruent' = '#FF5733','Neutral' = '#d4af37','Congruent' = "#007200"),drop=FALSE)+
     ylab(ifelse(include_y, ifelse(trust, "Trust", "Support"), ""))  + 
     xlab(paste0('Politicization (', xlab_use, ')')) +
     theme(axis.text=element_text(size=15), 
@@ -248,13 +263,13 @@ b1 = plot_congruence_2(df_2, "Who",T,"WHO",F,T)
 b2 = plot_congruence_2(df_2, "Doc",F,"Doctors",F,T)
 b3 = plot_congruence_2(df_2, "Judge",F,"Judges",T,T)
 ggarrange(a1, a2, a3, b1, b2, b3, labels = c("", "", "","", "", "","", "", ""),ncol = 3, nrow = 2, widths=c(0.85,0.78,1.15))
-ggsave("plots/Figure5-Study-2_Congrencextrust-politicization.png",width = 10,height = 7,units = "in",dpi = 300)
+ggsave("plots/Figure4-Study-2_Congrencextrust-politicization_2.png",width = 10,height = 7,units = "in",dpi = 300)
 
   
 ```
 
-# Figure 6
-We will create a similar figure to Fig. 5, but with support instead of trust
+# Figure 5
+We will create a similar figure to Fig. 4, but with support instead of trust
 
 ```{r}
 a1 = plot_congruence_2(df_2, "Prof",T,"Professors",F,F)
@@ -264,23 +279,23 @@ b1 = plot_congruence_2(df_2, "Who",T,"WHO",F,F)
 b2 = plot_congruence_2(df_2, "Doc",F,"Doctors",F,F)
 b3 = plot_congruence_2(df_2, "Judge",F,"Judges",T,F)
 ggarrange(a1, a2, a3, b1, b2, b3, labels = c("", "", "","", "", "","", "", ""),ncol = 3, nrow = 2, widths=c(0.85,0.78,1.15))
-ggsave("plots/Figure6-CongrencexSupport-politicization.png",width = 10,height = 7,units = "in",dpi = 300)
+ggsave("plots/Figure5-CongrencexSupport-politicization_2.png",width = 10,height = 7,units = "in",dpi = 300)
 
 ```
 
-# Figure 7
+# Figure Appendix
 We now want to look at our results from study 3. First, let's load the data
 
 ```{r}
 df_3 = read.csv('Study 3 anon.csv')
 
-df_3$TrustProf<- df_3$Trust_Prof + df_3$Trust_Prof.0 + df_3$Trust_Prof.1
-df_3$PolitProf <- df_3$Polit_Prof + df_3$Polit_Prof.0 + df_3$Polit_Prof.1
-df_3$SlantProf <- df_3$Slant_Prof + df_3$Slant_Prof.0 + df_3$Slant_Prof.1
+#df_3$TrustProf<- df_3$Trust_Prof + df_3$Trust_Prof.0 + df_3$Trust_Prof.1
+#df_3$PolitProf <- df_3$Polit_Prof + df_3$Polit_Prof.0 + df_3$Polit_Prof.1
+#df_3$SlantProf <- df_3$Slant_Prof + df_3$Slant_Prof.0 + df_3$Slant_Prof.1
 
-df_3$TrustPolice <- df_3$Trust_police + df_3$Trust_Police.0 + df_3$Trust_Police.1
-df_3$PolitPolice <- df_3$Polit_Police + df_3$Polit_Police.0 + df_3$Polit_Police.1
-df_3$SlantPolice <- df_3$Slant_Police + df_3$Slant_Police.0 + df_3$Slant_Police.1
+#df_3$TrustPolice <- df_3$Trust_police + df_3$Trust_Police.0 + df_3$Trust_Police.1
+#df_3$PolitPolice <- df_3$Polit_Police + df_3$Polit_Police.0 + df_3$Polit_Police.1
+#df_3$SlantPolice <- df_3$Slant_Police + df_3$Slant_Police.0 + df_3$Slant_Police.1
 
 ```
 
@@ -318,23 +333,141 @@ b1 <- plot_parties(df_reg,'Police',F,'Police',T,T)
 
 
 ggarrange(a1, b1, labels = c("", ""),ncol = 2, nrow = 1, widths=c(0.85,1.15))
-ggsave("plots/Figure7-Partyxpoliticization-trust.png",width = 8,height = 3.5,units = "in",dpi = 300)
+ggsave("plots/FigureX-Partyxpoliticization-trust.png",width = 8,height = 3.5,units = "in",dpi = 300)
+
+```
+
+```{r}
+plot_congruence_2 <- function(data, group,include_y,xlab_use,include_legend,trust){
+  df_reg <- data %>%
+    select(ends_with(group), Ideology) %>%
+    drop_na() %>%
+    mutate(
+      Slant_2 = get(paste0('Slant',group)) - 4,
+      Ideo_2 = Ideology - 4,
+      Matched_Bias = Slant_2 * Ideo_2,
+      Congruence = case_when(
+        is.na(Matched_Bias) ~ NA_character_,
+        Matched_Bias < 0 ~ "Incongruent",
+        Matched_Bias > 0 ~ "Congruent",
+        TRUE ~ "Neutral"
+      )
+    ) %>%
+    drop_na() %>%
+    mutate(Congruence = factor(Congruence, levels = c("Incongruent","Neutral", "Congruent")))
+  
+    if (group == "Fire" | group == 'Doc'){
+      print(nrow(df_reg %>% filter(Congruence == 'Incongruent')))
+      print(nrow(df_reg %>% filter(Congruence == 'Neutral')))
+      print(nrow(df_reg %>% filter(Congruence == 'Congruent')))
+      df_reg <- df_reg %>% filter(Congruence == 'Neutral') 
+    }
+  
+  a <- ggplot(df_reg, aes(x=get(paste0("Polit",group)), y = get(paste0(ifelse(trust, "Trust", "Support"),group)), color = Congruence)) + 
+    geom_point(alpha = 0.5, size =0.5) + geom_jitter(height = 0.5,width = 0.5,alpha = 0.5, size =0.5) + geom_smooth(method=glm,aes(fill=Congruence)) + 
+    ylim(0.5, 6.2) +
+    scale_color_manual(values=c('Incongruent' = '#FF5733','Neutral' = '#d4af37','Congruent' = "#007200"),drop=FALSE)+
+    scale_fill_manual(values=c('Incongruent' = '#FF5733','Neutral' = '#d4af37','Congruent' = "#007200"),drop=FALSE)+
+    ylab(ifelse(include_y, ifelse(trust, "Trust", "Support"), ""))  + 
+    xlab(paste0('Politicization (', xlab_use, ')')) +
+    theme(axis.text=element_text(size=15), 
+          axis.title=element_text(size=15), 
+          axis.title.x=element_text(size=15),
+          legend.position = ifelse(include_legend,'right',"none"),
+          panel.background = element_rect(fill='white'),
+          plot.background = element_rect(fill='transparent', color=NA),
+          axis.text.x=element_text(size=8, angle=90),
+          panel.border = element_rect(colour = "black", fill=NA, size=1))
+  return(a)
+}
+
+
+
+df_reg <- df_3 %>% select(Ideology,ACProfPass,TrustProf,PolitProf,SlantProf) %>% drop_na() %>% filter(ACProfPass == 1)
+a1 <- plot_congruence_2(df_reg,'Prof',T,'Professors',F,T)
+df_reg <- df_3 %>% select(Ideology,ACPolicePass,TrustPolice,PolitPolice,SlantPolice) %>% drop_na() %>% filter(ACPolicePass == 1)
+b1 <- plot_congruence_2(df_reg,'Police',F,'Police',T,T)
+
+
+ggarrange(a1, b1, labels = c("", ""),ncol = 2, nrow = 1, widths=c(0.85,1.15))
+ggsave("plots/Figure7-Congruencexpoliticization-trust.png",width = 8,height = 3.5,units = "in",dpi = 300)
+
+
+
+# Create Figure 8 by looking at support
+df_reg <- df_3 %>% select(Ideology,ACProfPass,SupportProf,PolitProf,SlantProf) %>% drop_na() %>% filter(ACProfPass == 1)
+a1 <- plot_congruence_2(df_reg,'Prof',T,'Professors',F,F)
+df_reg <- df_3 %>% select(Ideology,ACPolicePass,SupportPolice,PolitPolice,SlantPolice) %>% drop_na() %>% filter(ACPolicePass == 1)
+b1 <- plot_congruence_2(df_reg,'Police',F,'Police',T,F)
+
+
+ggarrange(a1, b1, labels = c("", ""),ncol = 2, nrow = 1, widths=c(0.85,1.15))
+ggsave("plots/Figure8-Congruencexpoliticization-support.png",width = 8,height = 3.5,units = "in",dpi = 300)
+
+
+
+df_reg <- df_3 %>% select(Ideology,PolitProf,SlantProf,TrustProf,SupportProf, ACProfPass) %>% drop_na() %>% filter(ACProfPass == 1)
+df_reg <- df_reg %>%
+    select(ends_with('Prof'), Ideology) %>%
+    drop_na() %>%
+    mutate(
+      Slant_2 = get(paste0('Slant','Prof')) - 4,
+      Ideo_2 = Ideology - 4,
+      Matched_Bias = Slant_2 * Ideo_2,
+      Congruence = case_when(
+        is.na(Matched_Bias) ~ NA_character_,
+        Matched_Bias < 0 ~ "Incongruent",
+        Matched_Bias > 0 ~ "Congruent",
+        TRUE ~ "Neutral"
+      )
+    ) %>%
+    drop_na() %>%
+    mutate(Congruence = factor(Congruence, levels = c("Incongruent","Neutral", "Congruent")))
+
+# Get correlations
+df_c <- df_reg %>% filter(Congruence == "Congruent")
+cor.test(df_c$PolitProf,df_c$TrustProf)
+cor.test(df_c$PolitProf,df_c$SupportProf)
+
+df_reg <- df_3 %>% select(Ideology,ACPolicePass,SupportPolice,TrustPolice,PolitPolice,SlantPolice) %>% filter(ACPolicePass == 1)
+df_reg <- df_reg %>%
+    select(ends_with('Police'), Ideology) %>%
+    drop_na() %>%
+    mutate(
+      Slant_2 = get(paste0('Slant','Police')) - 4,
+      Ideo_2 = Ideology - 4,
+      Matched_Bias = Slant_2 * Ideo_2,
+      Congruence = case_when(
+        is.na(Matched_Bias) ~ NA_character_,
+        Matched_Bias < 0 ~ "Incongruent",
+        Matched_Bias > 0 ~ "Congruent",
+        TRUE ~ "Neutral"
+      )
+    ) %>%
+    drop_na() %>%
+    mutate(Congruence = factor(Congruence, levels = c("Incongruent","Neutral", "Congruent")))
+
+df_c <- df_reg %>% filter(Congruence == "Congruent")
+cor.test(df_c$PolitPolice,df_c$TrustPolice)
+cor.test(df_c$PolitPolice,df_c$SupportPolice)
 
 ```
 
 
-# Figure 8
+
+
+# Figure appendix B
 Finally, we'll make one more figure that is much like the previous, but with support
 
 ```{r}
-df_reg <- df_3 %>% select(Ideology,ACProfPass,SupportProf,PolitProf) %>% drop_na() %>% filter(ACProfPass == 1)
+df_reg <- df_3 %>% select(Ideology,ACProfPass,SupportProf,PolitProf,SlantProf) %>% drop_na() %>% filter(ACProfPass == 1)
 a1 <- plot_parties(df_reg,'Prof',T,'Professors',F,F)
-df_reg <- df_3 %>% select(Ideology,ACPolicePass,SupportPolice,PolitPolice) %>% drop_na() %>% filter(ACPolicePass == 1)
+df_reg <- df_3 %>% select(Ideology,ACPolicePass,SupportPolice,PolitPolice,SlantPolice) %>% drop_na() %>% filter(ACPolicePass == 1)
 b1 <- plot_parties(df_reg,'Police',F,'Police',T,F)
 
 
 ggarrange(a1, b1, labels = c("", ""),ncol = 2, nrow = 1, widths=c(0.85,1.15))
-ggsave("plots/Figure8-Partyxpoliticization-support.png",width = 8,height = 3.5,units = "in",dpi = 300)
+ggsave("plots/FigureXX-Partyxpoliticization-support.png",width = 8,height = 3.5,units = "in",dpi = 300)
 ```
 
 

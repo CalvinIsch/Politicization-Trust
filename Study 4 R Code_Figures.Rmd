@@ -1,0 +1,309 @@
+---
+title: "Study 4 R Code - Figures"
+author: "Calvin Isch"
+date: "7/29/2023"
+output: html_document
+---
+
+```{r}
+library(ggplot2); library(dplyr); library(ggpubr); library(ggrepel); library(tidyr)
+
+df <- read.csv('data/Study 4 R Data.csv')
+custom_palette <- colorRampPalette(c("blue", "#5A5A5A", "red"))
+```
+
+# Figure 3 - Main text
+```{r}
+# Get a list of all the organizations
+all_groups <- c()
+for (n in names(df %>% select(starts_with("Slant_")))){
+  all_groups <- c(all_groups,substring(n,unlist(gregexpr('_', n))[1]+1))
+}
+
+# Calculate the mean trust, skepticism, politicization and slant
+trust <- c()
+skept <- c()
+slant <- c()
+polit <- c()
+for (g in all_groups){
+  trust <- c(trust,mean(df[,paste("Trust_",g,sep='')],na.rm=TRUE))
+  skept <- c(skept,mean(df[,paste('Skept_',g,sep='')],na.rm=TRUE))
+  slant <- c(slant,mean(df[,paste("Slant_",g,sep='')],na.rm=TRUE))
+  polit <- c(polit,mean(df[,paste("Polit_",g,sep='')],na.rm=TRUE))
+}
+df_means <- data.frame(all_groups,trust,slant,polit,skept)
+
+# Add associated nice labels for the plot
+df_means <- df_means[order(df_means$slant),]
+df_means$nice_names <- c("Gender Studies", "Ethnic Studies", "Environmental Sci.", "Social Work", "Art", "Sociology",
+         "Music", "Psychology","Earth Science", "Foreign Language", "Education", "Literature", "Philosophy",
+         "Public Health", "Anthropology","Biology","Communication","Nursing","Physics","Political Science",
+         "History","Chemistry", "Computer Science", "IT", "Math", "Criminal Justice", "English", "Econ",
+         "Business", "Religious Studies")
+df_means <- rename(df_means, Slant = slant)
+
+# Plot them
+a<- ggplot(df_means, aes(x=polit, y = trust, col = Slant)) + 
+  geom_point(size=0.5) + geom_smooth(method=glm, color='black',linetype=0) + 
+  geom_text_repel(aes(label = nice_names), box.padding = 0.2, size = 2) +
+  labs(color='Slant')+ ylab('Mean Disc. Trust') + xlab('Mean Disc. Politicization') + ggtitle('Study 4 (Trust)')+
+  theme(axis.text=element_text(size=10), 
+        axis.title=element_text(size=12), 
+        legend.position = 'none',
+        plot.title=element_text(size=15,hjust=0.5),
+        panel.background = element_rect(fill='white'),
+        plot.background = element_rect(fill='white', color=NA),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  coord_cartesian(xlim = c(1,6), ylim = c(2,5.0)) +
+  scale_color_gradientn(limits = c(20, 80), colors = custom_palette(100))
+
+b<- ggplot(df_means, aes(x=polit, y = skept, col = Slant)) + 
+  geom_point(size=0.5) + geom_smooth(method=glm, color='black',linetype=0) + 
+  geom_text_repel(aes(label = nice_names), box.padding = 0.2, size = 2) +
+  labs(color='Slant')+ ylab('Mean Disc. Skepticism') + xlab('Mean Disc. Politicization') + ggtitle('Study 4 (Skepticism)')+
+  theme(axis.text=element_text(size=12), 
+        axis.title=element_text(size=12), 
+        legend.position = 'right',
+        plot.title=element_text(size=15,hjust=0.5),
+        panel.background = element_rect(fill='white'),
+        plot.background = element_rect(fill='white', color=NA),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  coord_cartesian(xlim = c(1,6), ylim = c(2,5.0)) +
+  scale_color_gradientn(limits = c(20, 80), colors = custom_palette(100))
+
+fig_3 <- ggarrange(a, b, labels = c(""),ncol = 2, nrow = 1, widths=c(.85,  1))
+ggsave("figures/Figure3-Discipline-Trust-Skepticism.png",fig_3,width = 8,height = 3.5,units = "in",dpi = 300)
+
+
+cor.test(df_means$polit,df_means$trust)
+cor.test(df_means$polit,df_means$skept)
+cor.test(df_means$Slant,df_means$trust)
+cor.test(df_means$Slant,df_means$skept)
+
+```
+
+## Figure 4 - Main Text
+```{r}
+
+# First, a function to plot the relationship between trust/skepticism and politicization for each discipline
+plot_congruence <- function(data, group,include_y,xlab_use,include_legend, include_x,trust_or_skept, is_top){
+  group_prefix <- paste0("_", group)
+  df_reg <- data %>%
+    select(ends_with(group_prefix), Ideology) %>%
+    drop_na() %>%
+    mutate(Slant_2 = get(paste0('Slant',group_prefix)) - 50,
+           Ideo_2 = Ideology - 4,
+           Matched_Bias = Slant_2 * Ideo_2,
+           Congruence = case_when(
+             is.na(Matched_Bias) ~ NA_character_,
+             Matched_Bias < 0 ~ "Incongruent",
+             Matched_Bias > 0 ~ "Congruent",
+             TRUE ~ 'Neutral'
+           )
+    ) %>% drop_na()
+  df_reg$Congruence <- factor(df_reg$Congruence, levels = c('Incongruent','Neutral','Congruent')) 
+  
+  plot_return <- ggplot(df_reg, aes(x = get(paste0("Polit",group_prefix)), y = get(paste0(ifelse(trust_or_skept, "Trust", "Skept"),group_prefix)), color = Congruence)) + 
+    geom_smooth(method = glm,se=F) + 
+    scale_color_manual(values = c('#FF5733','#d4af37',"#007200")) + 
+    ylab(ifelse(include_y, ifelse(trust_or_skept, "Trust", "Skepticism"), ""))  + ggtitle(xlab_use) + xlab(ifelse(include_x, "Politicization", "")) + 
+    ylim(0.5, 6.2) + xlim(0.5,6.2)+ labs(color = NULL)+
+    theme(
+      axis.text = element_text(size = 28), # 25
+      plot.margin = unit(c(ifelse(is_top,1,-0.05),ifelse(include_legend,1,-0.01),ifelse(include_x,1,-0.01),ifelse(include_y,1,-0.01)), 'lines'),
+      plot.title = element_text(size = 30, hjust=0.5), #27
+      axis.title.x = element_text(size = 28),
+      axis.title.y = element_text(size = 28),
+      legend.key=element_rect(fill="white"),
+      legend.text=element_text(size=28),
+      legend.position = "none",#ifelse(include_legend,'right',"none"),
+      panel.background = element_rect(fill = 'white'),
+      plot.background = element_rect(fill = 'white'),
+      axis.text.x = element_text(size = ifelse(include_x, 20, 0)),
+      axis.text.y = element_text(size = ifelse(include_y, 20, 0)),
+      panel.border = element_rect(colour = "black", fill = NA, size = 1)
+    )
+  
+  # Report the coefficients
+  d_c <- df_reg %>% filter(df_reg$Congruence == 'Congruent')
+  m <- lm(get(paste0(ifelse(trust_or_skept, "Trust", "Skept"),group_prefix)) ~ get(paste0("Polit",group_prefix)), d_c)
+  c <- as.numeric(m$coefficients[2])
+  
+  d_i <- df_reg %>% filter(df_reg$Congruence == 'Incongruent')
+  m <- lm(get(paste0(ifelse(trust_or_skept, "Trust", "Skept"),group_prefix)) ~ get(paste0("Polit",group_prefix)), d_i)
+  i <-  as.numeric(m$coefficients[2])
+  
+  d_n <- df_reg %>% filter(df_reg$Congruence == 'Neutral')
+  m <- lm(get(paste0(ifelse(trust_or_skept, "Trust", "Skept"),group_prefix)) ~ get(paste0("Polit",group_prefix)), d_n)
+  n <- as.numeric(m$coefficients[2])
+  
+  return(list(plot_return,c,i,n))
+}
+
+all_groups <- df_means[order(df_means$Slant),]$all_groups
+all_group_labels <- df_means[order(df_means$Slant),]$nice_names
+
+# Now create the plot for each org, keeping the various plot attributes depending
+# on the position in the grid.
+d <- list(); d_2 <- list(); labels_here <- c()
+coefs_con_t <- c(); coefs_inc_t <- c(); coefs_neu_t <- c()
+coefs_con_s <- c(); coefs_inc_s <- c(); coefs_neu_s <- c()
+for (org in 1:length(all_groups)){
+  put_legend = F
+  put_x = F
+  put_y = F
+  tp = F
+  if (org / 6 >= 4.01) {
+    put_x = T
+  }
+  if (org %% 6 == 0) {
+    put_legend = T
+  }
+  if (org < 7) {
+    tp = T
+  }
+  if (org %% 6 == 1){ 
+    put_y = T
+  }
+  plot <- plot_congruence(df, all_groups[org],put_y,all_group_labels[org],put_legend,put_x, T,tp)
+  d[[org]] <- plot[[1]]
+  coefs_con_t <- c(coefs_con_t,plot[[2]])
+  coefs_inc_t <- c(coefs_inc_t,plot[[3]])
+  coefs_neu_t <- c(coefs_neu_t,plot[[4]])
+  plot_2 <- plot_congruence(df, all_groups[org],put_y,all_group_labels[org],put_legend,put_x, F,tp)
+  d_2[[org]] <- plot_2[[1]]
+  coefs_con_s <- c(coefs_con_s,plot_2[[2]])
+  coefs_inc_s <- c(coefs_inc_s,plot_2[[3]])
+  coefs_neu_s <- c(coefs_neu_s,plot_2[[4]])
+  labels_here <- c(labels_here,"")
+}
+
+# Arrange Panel A
+A <- ggarrange(plotlist=d_2, labels = labels_here,ncol = 6, nrow = 5, widths=c(0.8,0.78,0.78,0.78,0.78,0.78)) + bgcolor("White") + theme(plot.margin = margin(.9,.9,.9,.9, "in"), panel.border = element_rect(color = "black",fill = NA,size = 1.25))
+
+
+
+# Moving onto panel B, we need to calculate the coefficients from linear regressions. We already have this for 
+# Study 4 so we can directly plot those:
+plot_slopes <- function(data, title, plot_legend, plot_yaxis) {
+  plot_return <- ggplot(data, aes(x=coefs, fill=groups)) +
+    geom_histogram(alpha=0.5, position = 'identity') +
+    scale_fill_manual(values=c("#007200",'#d4af37','#FF5733')) +
+  ylab(ifelse(plot_yaxis, "Count", "")) + xlab('Coefficient of slope') +
+  ggtitle(title) +
+  geom_vline(xintercept=0, color = "black") + 
+  geom_hline(yintercept = 0, color = "gray") +
+  theme(
+      axis.text = element_text(size = 28), # 25
+      plot.margin = unit(c(1,ifelse(plot_legend,1,0),0.05,ifelse(plot_yaxis,1,0)), 'lines'),
+      plot.title = element_text(size = 36, hjust = 0.5), #27
+      axis.title.x = element_text(size = 28),
+      axis.title.y = element_text(size = ifelse(plot_yaxis,28, 0)),
+      legend.key=element_rect(fill="white"),
+      legend.text=element_text(size=28),
+      legend.position = ifelse(plot_legend,'right',"none"),
+      panel.background = element_rect(fill = 'white'),
+      plot.background = element_rect(fill = 'white'),
+      axis.text.x = element_text(size = 20),
+      axis.text.y = element_text(size = 20),
+      panel.border = element_rect(colour = "black", fill = NA, size = 1)
+    ) + labs(fill="") + coord_cartesian(xlim = c(-0.85,0.85), ylim = c(-0.25,10.5)) + scale_y_continuous(n.breaks=3)
+  
+  return(plot_return)
+}
+
+# Trust
+coefs <- c(coefs_con_t,coefs_neu_t,coefs_inc_t)
+groups = c(rep("Congruent", length(coefs_con_t)), rep("Neutral", length(coefs_neu_t)), rep("Incongruent", length(coefs_inc_t)) )
+df_slopes <- data.frame(groups,coefs)
+df_slopes$groups <- factor(df_slopes$groups , levels = c('Congruent','Neutral','Incongruent'))
+b <- plot_slopes(df_slopes, 'Study 2 (Trust)',F,F)
+
+
+# Skepticism
+coefs <- c(coefs_con_s,coefs_neu_s,coefs_inc_s)
+groups = c(rep("Congruent", length(coefs_con_s)), rep("Neutral", length(coefs_neu_s)), rep("Incongruent", length(coefs_inc_s)) )
+df_slopes <- data.frame(groups,coefs)
+df_slopes$groups <- factor(df_slopes$groups , levels = c('Congruent','Neutral','Incongruent'))
+c <- plot_slopes(df_slopes, 'Study 2 (Skepticism)',T,F)
+
+
+# Now we need to get Study 1 data for first figure in panel b
+df_1 <- read.csv('data/Study 1 R Data.csv')
+
+get_slopes <- function(data, group, trust_or_skept){
+  group_prefix <- paste0("_", group)
+  df_reg <- data %>%
+    select(ends_with(group_prefix), Ideology) %>%
+    drop_na() %>%
+    mutate(Slant_2 = get(paste0('slant',group_prefix)) - 50,
+           Ideo_2 = Ideology - 4,
+           Matched_Bias = Slant_2 * Ideo_2,
+           Congruence = case_when(
+             is.na(Matched_Bias) ~ NA_character_,
+             Matched_Bias < 0 ~ "Incongruent",
+             Matched_Bias > 0 ~ "Congruent",
+             TRUE ~ 'Neutral'
+           )
+    ) %>% drop_na()
+  df_reg$Congruence <- factor(df_reg$Congruence, levels = c('Incongruent','Neutral','Congruent')) 
+  
+  d_c <- df_reg %>% filter(df_reg$Congruence == 'Congruent')
+  m <- lm(get(paste0(ifelse(trust_or_skept, "Trust", "Skept"),group_prefix)) ~ get(paste0("polit",group_prefix)), d_c)
+  c <- as.numeric(m$coefficients[2])
+  
+  d_i <- df_reg %>% filter(df_reg$Congruence == 'Incongruent')
+  m <- lm(get(paste0(ifelse(trust_or_skept, "Trust", "Skept"),group_prefix)) ~ get(paste0("polit",group_prefix)), d_i)
+  i <-  as.numeric(m$coefficients[2])
+  
+  d_n <- df_reg %>% filter(df_reg$Congruence == 'Neutral')
+  m <- lm(get(paste0(ifelse(trust_or_skept, "Trust", "Skept"),group_prefix)) ~ get(paste0("polit",group_prefix)), d_n)
+  n <- as.numeric(m$coefficients[2])
+  
+  return(c(c,i,n))
+}
+
+all_groups <- c()
+for (n in names(df_1 %>% select(starts_with("Slant_")))){
+  all_groups <- c(all_groups,substring(n,unlist(gregexpr('_', n))[1]+1))
+}
+  
+coefs_con <- c(); coefs_inc <- c(); coefs_neu <- c()
+for (org in 1:length(all_groups)){
+  slopes <- get_slopes(df_1, all_groups[org], T)
+  coefs_con <- c(coefs_con,slopes[1])
+  coefs_inc <- c(coefs_inc,slopes[2])
+  coefs_neu <- c(coefs_neu,slopes[3])
+}
+
+
+coefs <- c(coefs_con,coefs_neu,coefs_inc)
+groups = c(rep("Congruent", length(coefs_con)), rep("Neutral", length(coefs_neu)), rep("Incongruent", length(coefs_inc)) )
+df_slopes <- data.frame(groups,coefs)
+df_slopes$groups <- factor(df_slopes$groups , levels = c('Congruent','Neutral','Incongruent'))
+a <- plot_slopes(df_slopes, 'Study 1 (Trust)',F,T)
+
+
+B <- ggarrange(a, NULL, b,NULL, c, labels = c("", "","","",""),ncol = 5, nrow = 1, widths=c(.7,.05,.65,0.05,.9)) + bgcolor("White") + theme(plot.margin = margin(.9,.9,.9,.9, "in"), panel.border = element_rect(color = "black",fill = NA,size = 1.25))
+
+
+fig_4 <- ggarrange(A, B, labels = c("A","B"),ncol = 1, nrow = 2, heights=c(3,1),font.label = list(size = 55)) + theme(plot.background = element_rect(fill = "white"))
+ggsave("figures/Figure4-Discipline-Trust-Skepticism-Individual.png",fig_4,width = 27,height = 30,units = "in",dpi = 300)
+
+
+# Wilcoxon Tests to determine whether the slopes are sufficiently different from 0
+# Study 1 - Trust
+wilcox.test(coefs_con)
+sum(coefs_con < 0)
+
+# Study 4 -Trust
+wilcox.test(coefs_con_t)
+sum(coefs_con_t < 0)
+
+
+# Study 4 -Skepticism
+wilcox.test(coefs_con_s)
+sum(coefs_con_s > 0)
+```
+
+

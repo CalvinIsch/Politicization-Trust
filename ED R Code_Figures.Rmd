@@ -1,0 +1,448 @@
+---
+title: "ED R Code - Figures"
+author: "Calvin Isch"
+date: "7/29/2023"
+output: html_document
+---
+
+```{r}
+library(ggplot2); library(dplyr);library(tidyverse); library(ggpubr); library(ggrepel); library(emmeans); library(readxl)
+```
+
+## E1 - Politicization, Trust, and Congruence across 40 orgs from study 1
+```{r }
+df_1 <- read_csv('data/Study 1 R Data.csv')
+colnames(df_1) <- tolower(colnames(df_1))
+
+# Get a list of all the group names
+all_groups <- c()
+for (n in names(df_1 %>% select(starts_with("slant_")))){
+  df
+  all_groups <- c(all_groups,substring(n,unlist(gregexpr('_', n))[1]+1))
+}
+
+# Report mean values for slant so we have nice ordering, then add nice names
+slant <- c()
+for (g in all_groups){
+  slant <- c(slant,mean(as.integer(unlist(df_1[,paste("slant_",g,sep=''), ignore.case = T])),na.rm=TRUE))
+}
+df_means <- data.frame(all_groups,slant)
+
+# Order them by slant and add appropriate labels for the plot
+df_means <- df_means[order(df_means$slant),]
+all_group_labels <- c('Hollywood', 'PETA', 'Professors', 'WHO', 'Journalists', 'ASPCA', 'Psychologists', 'Librarians', 'K12 Teachers', 'Scientists', 'Facebook', 'United Nations', 'Physicists', 'Chefs', 'Pollsters', 'Veterinarians', 'Think Tanks', 'NFL', 'USPS', 'Tailors', 'Toll Workers', 'Congress', 'Doctors', 'Lawyers', 'CIA', 'Economists', 'Park Rangers', 'Dentists', 'Real Estate', 'MLB', 'Pharmaceutical', 'State Judges', 'Criminal Justice', 'Local Business', 'Firefighters', 'Mechanics', 'Banks', 'Supreme Court', 'Police', 'Catholic Church')
+df_means$nice_names <- all_group_labels
+
+
+plot_congruence <- function(data, group,include_y,xlab_use,include_legend, include_x, is_top){
+  group_prefix <- paste0("_", group)
+  df_reg <- data %>%
+    select(ends_with(group_prefix), ideology) %>%
+    drop_na() %>%
+    mutate(Slant_2 = get(paste0('slant',group_prefix)) - 50,
+           Ideo_2 = ideology - 4,
+           Matched_Bias = Slant_2 * Ideo_2,
+           Congruence = case_when(
+             is.na(Matched_Bias) ~ NA_character_,
+             Matched_Bias < 0 ~ "Incongruent",
+             Matched_Bias > 0 ~ "Congruent",
+             TRUE ~ 'Neutral'
+           )
+    ) %>% 
+    drop_na()
+  df_reg$Congruence <- factor(df_reg$Congruence, levels = c('Incongruent','Neutral','Congruent')) #'Neutral','Congruent'))
+  
+  a <- ggplot(df_reg, aes(x = get(paste0("polit",group_prefix)), y = get(paste0("trust",group_prefix)), color = Congruence)) + 
+    geom_smooth(method = glm,se=F) + 
+    scale_color_manual(values = c('#FF5733','#d4af37',"#007200")) + 
+    ylab(ifelse(include_y, "Trust", ""))  + ggtitle(xlab_use) + xlab(ifelse(include_x, "Politicization", "")) + 
+    ylim(0.5, 6.2) + xlim(0.5,6.2)+ labs(color = NULL)+
+    theme(
+      axis.text = element_text(size = 20), 
+      plot.margin = unit(c(ifelse(is_top,1,-0.05),ifelse(include_legend,1,-0.01),ifelse(include_x,1,-0.01),ifelse(include_y,1,-0.01)), 'lines'),
+      plot.title = element_text(size = 26, hjust=0.5),
+      axis.title.x = element_text(size = 24),
+      axis.title.y = element_text(size = 24),
+      legend.key=element_rect(fill="white"),
+      legend.text=element_text(size=22),
+      legend.position = ifelse(include_legend,'right',"none"),
+      panel.background = element_rect(fill = 'white'),
+      plot.background = element_rect(fill = 'white'),
+      axis.text.x = element_text(size = ifelse(include_x, 20, 0)),
+      axis.text.y = element_text(size = ifelse(include_y, 20, 0)),
+      panel.border = element_rect(colour = "black", fill = NA, size = 1)
+    )
+  
+  return(a)
+}
+
+all_groups <- df_means$all_groups
+d <- list()
+labels_here <- c()
+for (org in 1:length(all_groups)){
+  put_legend = F
+  put_x = F
+  put_y = F
+  top_one = F
+  if (org %% 8 == 0) {#5 for 8 x 5
+    put_legend = T
+  }
+  if (org < 9) {
+    top_one = T
+  }
+  if (org / 8 >= 4.01) { # 4.5 8 x 5 
+    put_x = T
+  }
+  if (org %% 8 == 1){ # 5 for row
+    put_y = T
+  }
+  plot <- plot_congruence(df_1, all_groups[org],put_y,all_group_labels[org],put_legend,put_x, top_one)
+  d[[org]] <- plot
+  labels_here <- c(labels_here,"")
+}
+
+ggarrange(plotlist=d, labels = labels_here,ncol = 8, nrow = 5, widths=c(0.85,0.78,0.78,0.78,0.78,0.78,0.78,1.35))
+ggsave("Ed_figures/FigureE1-All-orgs-polit-trust-congruence.png",width = 30,height = 18,units = "in",dpi = 300)
+
+```
+
+## E2 - Politicization, Trust/Deferrance, and Congruence for conditions from study 2a and 2b
+```{r}
+df_2a <- read_excel('data/Study 2a R Data.xlsx')
+
+plot_congruence_2 <- function(data, group,include_y,xlab_use,include_legend,trust){
+  df_reg <- data %>%
+    select(ends_with(group), Ideology) %>%
+    drop_na() %>%
+    mutate(
+      Slant_2 = get(paste0('Slant',group)) - 4,
+      Ideo_2 = Ideology - 4,
+      Matched_Bias = Slant_2 * Ideo_2,
+      Congruence = case_when(
+        is.na(Matched_Bias) ~ NA_character_,
+        Matched_Bias < 0 ~ "Incongruent",
+        Matched_Bias > 0 ~ "Congruent",
+        TRUE ~ "Neutral"
+      )
+    ) %>%
+    drop_na() %>%
+    mutate(Congruence = factor(Congruence, levels = c("Incongruent","Neutral", "Congruent")))
+  
+  a <- ggplot(df_reg, aes(x=get(paste0("Polit",group)), y = get(paste0(ifelse(trust, "Trust", "Support"),group)), color = Congruence)) + 
+    geom_point(alpha = 0.5, size =0.5) + geom_jitter(height = 0.5,width = 0.5,alpha = 0.5, size =0.5) + geom_smooth(method=glm,aes(fill=Congruence)) + 
+    ylim(0.5, 6.2) +
+    scale_color_manual(values=c('Incongruent' = '#FF5733','Neutral' = '#d4af37','Congruent' = "#007200"),drop=FALSE)+
+    scale_fill_manual(values=c('Incongruent' = '#FF5733','Neutral' = '#d4af37','Congruent' = "#007200"),drop=FALSE)+
+    ylab(ifelse(include_y, ifelse(trust, "Trust", "Support"), ""))  + 
+    xlab(paste0('Politicization (', xlab_use, ')')) +
+    theme(axis.text=element_text(size=15), 
+          axis.title=element_text(size=15), 
+          axis.title.x=element_text(size=15),
+          legend.position = ifelse(include_legend,'right',"none"),
+          panel.background = element_rect(fill='white'),
+          plot.background = element_rect(fill='transparent', color=NA),
+          panel.border = element_rect(colour = "black", fill=NA, size=1))
+  return(a)
+}
+
+a1 = plot_congruence_2(df_2a, "Prof",T,"Professors",F,T)
+a2 = plot_congruence_2(df_2a, "Fire",F,"Fire",F,T)
+a3 = plot_congruence_2(df_2a, "Police",F,"Police",F,T)
+b1 = plot_congruence_2(df_2a, "Who",T,"WHO",F,T)
+b2 = plot_congruence_2(df_2a, "Doc",F,"Doctors",F,T)
+b3 = plot_congruence_2(df_2a, "Judge",F,"Judges",F,T)
+a <- ggarrange(a1, a2, a3, b1, b2, b3, labels = c("", "", "","", "", "","", "", ""),ncol = 3, nrow = 2, widths=c(0.85,0.78,.78))
+
+a1 = plot_congruence_2(df_2a, "Prof",T,"Professors",F,F)
+a2 = plot_congruence_2(df_2a, "Fire",F,"Fire",F,F)
+a3 = plot_congruence_2(df_2a, "Police",F,"Police",T,F)
+b1 = plot_congruence_2(df_2a, "Who",T,"WHO",F,F)
+b2 = plot_congruence_2(df_2a, "Doc",F,"Doctors",F,F)
+b3 = plot_congruence_2(df_2a, "Judge",F,"Judges",T,F)
+b <- ggarrange(a1, a2, a3, b1, b2, b3, labels = c("", "", "","", "", "","", "", ""),ncol = 3, nrow = 2, widths=c(0.85,0.78,1.17))
+
+
+
+
+df_2b = read.csv('data/Study 2b R Data.csv')
+
+plot_congruence_3 <- function(data, group,include_y,xlab_use,include_legend,trust){
+  df_reg <- data %>%
+    select(ends_with(group), Ideology) %>%
+    drop_na() %>%
+    mutate(
+      Slant_2 = get(paste0('Slant',group)) - 4,
+      Ideo_2 = Ideology - 4,
+      Matched_Bias = Slant_2 * Ideo_2,
+      Congruence = case_when(
+        is.na(Matched_Bias) ~ NA_character_,
+        Matched_Bias < 0 ~ "Incongruent",
+        Matched_Bias > 0 ~ "Congruent",
+        TRUE ~ "Neutral"
+      )
+    ) %>%
+    drop_na() %>%
+    mutate(Congruence = factor(Congruence, levels = c("Incongruent","Neutral", "Congruent")))
+  
+  a <- ggplot(df_reg, aes(x=get(paste0("Polit",group)), y = get(paste0(ifelse(trust, "Trust", "Support"),group)), color = Congruence)) + 
+    geom_point(alpha = 0.5, size =0.5) + geom_jitter(height = 0.5,width = 0.5,alpha = 0.5, size =0.5) + geom_smooth(method=glm,aes(fill=Congruence)) + 
+    ylim(0.5, 6.2) +
+    scale_color_manual(values=c('Incongruent' = '#FF5733','Neutral' = '#d4af37','Congruent' = "#007200"),drop=FALSE)+
+    scale_fill_manual(values=c('Incongruent' = '#FF5733','Neutral' = '#d4af37','Congruent' = "#007200"),drop=FALSE)+
+    ylab(ifelse(include_y, ifelse(trust, "Trust", "Support"), ""))  + 
+    xlab(paste0('Politicization (', xlab_use, ')')) +
+    theme(axis.text=element_text(size=15), 
+          axis.title=element_text(size=15), 
+          axis.title.x=element_text(size=15),
+          legend.position = ifelse(include_legend,'right',"none"),
+          panel.background = element_rect(fill='white'),
+          plot.background = element_rect(fill='transparent', color=NA),
+          panel.border = element_rect(colour = "black", fill=NA, size=1))
+  return(a)
+}
+
+df_reg <- df_2b %>% select(Ideology,ACProfPass,TrustProf,PolitProf,SlantProf) %>% drop_na() %>% filter(ACProfPass == 1)
+a1 <- plot_congruence_3(df_reg,'Prof',T,'Professors',F,T)
+df_reg <- df_2b %>% select(Ideology,ACPolicePass,TrustPolice,PolitPolice,SlantPolice) %>% drop_na() %>% filter(ACPolicePass == 1)
+b1 <- plot_congruence_3(df_reg,'Police',F,'Police',F,T)
+c <- ggarrange(a1, b1, labels = c("", ""),ncol = 2, nrow = 1, widths=c(1,.95))
+
+df_reg <- df_2b %>% select(Ideology,ACProfPass,SupportProf,PolitProf,SlantProf) %>% drop_na() %>% filter(ACProfPass == 1)
+a1 <- plot_congruence_2(df_reg,'Prof',T,'Professors',F,F)
+df_reg <- df_2b %>% select(Ideology,ACPolicePass,SupportPolice,PolitPolice,SlantPolice) %>% drop_na() %>% filter(ACPolicePass == 1)
+b1 <- plot_congruence_2(df_reg,'Police',F,'Police',T,F)
+d <- ggarrange(a1, b1, labels = c("", ""),ncol = 2, nrow = 1, widths=c(0.85,1.15))
+
+A <- ggarrange(a,NULL,b, labels = c("","",""),ncol=3,widths = c(0.88,0.05,1)) + bgcolor("White") + theme(plot.margin = margin(.01,.01,.01,.01, "in"), panel.border = element_rect(color = "black",fill = NA,size = 1.25))
+
+B <- ggarrange(c,NULL,d, labels = c("","",""),ncol=3,widths = c(0.88,0.05,1)) + bgcolor("White") + theme(plot.margin = margin(.01,.01,.01,.01, "in"), panel.border = element_rect(color = "black",fill = NA,size = 1.25))
+
+
+ggarrange(A,NULL,B, labels = c("A", "", "B"),ncol=1,nrow=3,heights=c(5,0.1,4),font.label = list(size = 18)) + bgcolor("White")
+ggsave("ED_figures/FigureE2-Study2results.png",width = 18,height = 9,units = "in",dpi = 300)
+```
+
+## E5 - Manova results with estimated marginal means for Study 3 results
+```{r}
+df_3 <- read.csv('data/Study 3 R Data.csv')
+
+df_3 <- df_3 %>%
+    mutate(
+      Condition = case_when(
+        is.na(RangCond) ~ NA_character_,
+        RangCond < 0 ~ "Biden endorsement",
+        RangCond > 0 ~ "Trump endorsement",
+        TRUE ~ "Control"
+      ),
+      Vote_2 = case_when(
+        is.na(Vote) ~ NA_character_,
+        Vote == 2 ~ "Biden Voters",
+        Vote == 1 ~ "Trump Voters",
+        Vote == 3 ~ "Other/Neither"
+      )
+    ) %>%
+    mutate(Condition = factor(Condition, levels = c("Biden endorsement","Control", "Trump endorsement"))) %>%
+    mutate(Vote_2 = factor(Vote_2, levels = c("Biden Voters", "Other/Neither","Trump Voters")))
+
+
+result <- manova(cbind(TrustRang, SupportRang, TrustAllRang, SupportAllRang) ~ Condition * Vote_2, data = df_3)
+summary(result)
+summary.aov(result)
+
+plot_dependent <- function(variable,plot_title, include_y, include_x, include_legend){
+  result <- aov(get(variable) ~ Condition * Vote_2, data = df_3)
+  emm <- emmeans(result, ~ Condition:Vote_2)
+  emm_df <- as.data.frame(emm)
+  
+  a <- ggplot(emm_df, aes(x = Vote_2, y = emmean, fill = Condition, group = Condition)) +
+    geom_bar(stat = "identity", position = position_dodge(width = .85), color = "black", width=0.75) +
+    geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.25, position = position_dodge(width = .85)) +
+    labs(x = "Vote_2", y = "Estimated Marginal Mean", title = "Estimated Marginal Means by Condition and Vote_2") +
+    scale_color_manual(values=c('Biden endorsement' = '#5499C7','Control' = 'gray','Trump endorsement' = "#EC7063"),drop=FALSE)+
+    scale_fill_manual(values=c('Biden endorsement' = '#5499C7','Control' = 'gray','Trump endorsement' = "#EC7063"),drop=FALSE)+
+    ylab(ifelse(include_y, 'Estimated Marginal Means', '')) + xlab(ifelse(include_x, 'Preferred presidential candidate (2020)', '')) + ggtitle(paste(plot_title)) + 
+    coord_cartesian(ylim = c(1,6))+ theme_bw() + 
+    theme(axis.text=element_text(size=15),
+          axis.title=element_text(size=18),
+          plot.title = element_text(size = 20, hjust = 0.5),
+          legend.title = element_text(size=18),
+          legend.text = element_text(size = 15),
+          legend.position = ifelse(include_legend,'right',"none"))
+  return(a)
+}
+
+a1 <- plot_dependent('TrustRang', 'Trust Get Outdoor', T,F,F)
+a2 <- plot_dependent('SupportRang', 'Support Get Outdoor', F,F,T)
+b1 <- plot_dependent('TrustAllRang', 'Trust All Rangers', T,T,F)
+b2 <- plot_dependent('SupportAllRang', 'Support All Rangers', F,T,T)
+
+ggarrange(a1, a2, b1, b2, labels = c("", "", "",""),ncol=2,nrow=2,widths = c(0.72,1))
+ggsave("ED_figures/figureE5-Manova.png",width = 16,height = 12,units = "in",dpi = 300)
+
+```
+
+## E7 - Interactions Between Ideological Congruence (and Perceived Politicization on Trust in Study 4 
+```{r}
+df_4 <- read.csv('data/Study 4 R Data.csv')
+
+all_groups <- c()
+for (n in names(df_4 %>% select(starts_with("Slant_")))){
+  all_groups <- c(all_groups,substring(n,unlist(gregexpr('_', n))[1]+1))
+}
+
+# Calculate the mean trust, skepticism, politicization and slant
+trust <- c()
+skept <- c()
+slant <- c()
+polit <- c()
+for (g in all_groups){
+  trust <- c(trust,mean(df_4[,paste("Trust_",g,sep='')],na.rm=TRUE))
+  skept <- c(skept,mean(df_4[,paste('Skept_',g,sep='')],na.rm=TRUE))
+  slant <- c(slant,mean(df_4[,paste("Slant_",g,sep='')],na.rm=TRUE))
+  polit <- c(polit,mean(df_4[,paste("Polit_",g,sep='')],na.rm=TRUE))
+}
+df_means <- data.frame(all_groups,trust,slant,polit,skept)
+
+# Add associated nice labels for the plot
+df_means <- df_means[order(df_means$slant),]
+df_means$nice_names <- c("Gender Studies", "Ethnic Studies", "Environmental Sci.", "Social Work", "Art", "Sociology",
+         "Music", "Psychology","Earth Science", "Foreign Language", "Education", "Literature", "Philosophy",
+         "Public Health", "Anthropology","Biology","Communication","Nursing","Physics","Political Science",
+         "History","Chemistry", "Computer Science", "IT", "Math", "Criminal Justice", "English", "Econ",
+         "Business", "Religious Studies")
+df_means <- rename(df_means, Slant = slant)
+
+# A function to plot the relationship between trust/skepticism and politicization for each discipline
+# Note: this is the same function used to create the skepticism plots in Figure 4 of the main text.
+plot_congruence <- function(data, group,include_y,xlab_use,include_legend, include_x,trust_or_skept, is_top){
+  group_prefix <- paste0("_", group)
+  df_reg <- data %>%
+    select(ends_with(group_prefix), Ideology) %>%
+    drop_na() %>%
+    mutate(Slant_2 = get(paste0('Slant',group_prefix)) - 50,
+           Ideo_2 = Ideology - 4,
+           Matched_Bias = Slant_2 * Ideo_2,
+           Congruence = case_when(
+             is.na(Matched_Bias) ~ NA_character_,
+             Matched_Bias < 0 ~ "Incongruent",
+             Matched_Bias > 0 ~ "Congruent",
+             TRUE ~ 'Neutral'
+           )
+    ) %>% drop_na()
+  df_reg$Congruence <- factor(df_reg$Congruence, levels = c('Incongruent','Neutral','Congruent')) 
+  
+  plot_return <- ggplot(df_reg, aes(x = get(paste0("Polit",group_prefix)), y = get(paste0(ifelse(trust_or_skept, "Trust", "Skept"),group_prefix)), color = Congruence)) + 
+    geom_smooth(method = glm,se=F) + 
+    scale_color_manual(values = c('#FF5733','#d4af37',"#007200")) + 
+    ylab(ifelse(include_y, ifelse(trust_or_skept, "Trust", "Skepticism"), ""))  + ggtitle(xlab_use) + xlab(ifelse(include_x, "Politicization", "")) + 
+    ylim(0.5, 6.2) + xlim(0.5,6.2)+ labs(color = NULL)+
+    theme(
+      axis.text = element_text(size = 28), # 25
+      plot.margin = unit(c(ifelse(is_top,1,-0.05),ifelse(include_legend,1,-0.01),ifelse(include_x,1,-0.01),ifelse(include_y,1,-0.01)), 'lines'),
+      plot.title = element_text(size = 28, hjust=0.5), #27
+      axis.title.x = element_text(size = 28),
+      axis.title.y = element_text(size = 28),
+      legend.key=element_rect(fill="white"),
+      legend.text=element_text(size=28),
+      legend.position = ifelse(include_legend,'right',"none"),
+      panel.background = element_rect(fill = 'white'),
+      plot.background = element_rect(fill = 'white'),
+      axis.text.x = element_text(size = ifelse(include_x, 20, 0)),
+      axis.text.y = element_text(size = ifelse(include_y, 20, 0)),
+      panel.border = element_rect(colour = "black", fill = NA, size = 1)
+    )
+  
+  # Report the coefficients
+  d_c <- df_reg %>% filter(df_reg$Congruence == 'Congruent')
+  m <- lm(get(paste0(ifelse(trust_or_skept, "Trust", "Skept"),group_prefix)) ~ get(paste0("Polit",group_prefix)), d_c)
+  c <- as.numeric(m$coefficients[2])
+  
+  d_i <- df_reg %>% filter(df_reg$Congruence == 'Incongruent')
+  m <- lm(get(paste0(ifelse(trust_or_skept, "Trust", "Skept"),group_prefix)) ~ get(paste0("Polit",group_prefix)), d_i)
+  i <-  as.numeric(m$coefficients[2])
+  
+  d_n <- df_reg %>% filter(df_reg$Congruence == 'Neutral')
+  m <- lm(get(paste0(ifelse(trust_or_skept, "Trust", "Skept"),group_prefix)) ~ get(paste0("Polit",group_prefix)), d_n)
+  n <- as.numeric(m$coefficients[2])
+  
+  return(list(plot_return,c,i,n))
+}
+
+all_groups <- df_means[order(df_means$Slant),]$all_groups
+all_group_labels <- df_means[order(df_means$Slant),]$nice_names
+
+# Now create the plot for each org, keeping the various plot attributes depending
+# on the position in the grid.
+d <- list(); d_2 <- list(); labels_here <- c()
+coefs_con_t <- c(); coefs_inc_t <- c(); coefs_neu_t <- c()
+for (org in 1:length(all_groups)){
+  put_legend = F
+  put_x = F
+  put_y = F
+  tp = F
+  if (org / 6 >= 4.01) {
+    put_x = T
+  }
+  if (org %% 6 == 0) {
+    put_legend = T
+  }
+  if (org < 7) {
+    tp = T
+  }
+  if (org %% 6 == 1){ 
+    put_y = T
+  }
+  plot <- plot_congruence(df_4, all_groups[org],put_y,all_group_labels[org],put_legend,put_x, T,tp)
+  d[[org]] <- plot[[1]]
+  coefs_con_t <- c(coefs_con_t,plot[[2]])
+  coefs_inc_t <- c(coefs_inc_t,plot[[3]])
+  coefs_neu_t <- c(coefs_neu_t,plot[[4]])
+}
+
+# Arrange Panel A
+ggarrange(plotlist=d, labels = labels_here,ncol = 6, nrow = 5, widths=c(0.8,0.78,0.78,0.78,0.78,1.38)) + bgcolor("White") 
+ggsave("ED_figures/figureE7-Interaction-congruence-trust-politicization.png",width = 27,height = 22.5,units = "in",dpi = 300)
+
+```
+
+
+## E9 - Influence of endorsement on measures from study 5
+```{r}
+df_5 = read.csv('data/Study 5 R Data.csv')
+
+df_5 <- df_5 %>%
+  mutate(Condition = case_when(
+    Cond == -1 ~ "Depoliticization",
+    Cond == 0 ~ "Control",
+    Cond == 1 ~ "Democrat",
+    Cond == 2 ~ "Republican"
+  ))
+
+
+plot_conditions <- function(data,outcome,include_y,ylab_use, include_x,xlab_use,include_legend){
+
+  a <- ggplot(data, aes(x=Ideology, y = get(outcome), color = Condition)) + 
+    geom_point(alpha = 0.5, size =0.5) + geom_jitter(height = 0.5,width = 0.5,alpha = 0.5, size =0.5) + geom_smooth(method=glm,aes(fill=Condition)) + 
+    ylim(0.5, 6.2) +
+    scale_color_manual(values=c('Depoliticization' = 'gold','Control' = '#228B22', 'Democrat' = '#0603C8','Republican' = "#990F02"),drop=FALSE)+
+    scale_fill_manual(values=c('Depoliticization' = 'gold','Control' = '#228B22', 'Democrat' = '#0603C8','Republican' = "#990F02"),drop=FALSE)+
+    ylab(ifelse(include_y, ylab_use, ""))  + 
+    xlab(ifelse(include_x,  xlab_use, "")) +
+    theme(axis.text=element_text(size=15), 
+          axis.title=element_text(size=15), 
+          axis.title.x=element_text(size=15),
+          legend.position = ifelse(include_legend,'right',"none"),
+          panel.background = element_rect(fill='white'),
+          plot.background = element_rect(fill='transparent', color=NA),
+          panel.border = element_rect(colour = "black", fill=NA, size=1))
+  return(a)
+}
+
+
+a1 <- plot_conditions(df_5,'Trust_AllEcon',T,"Trust All Economists",T,"Ideology",F)
+a2 <- plot_conditions(df_5,'Skepticism_AllEcon',T,'Skepticism All Economists',T,"Ideology",T)
+
+ggarrange(a1, a2, labels = c("",""), ncol=2, widths=c(0.75,1)) + bgcolor('White')
+ggsave("ED_figures/FigureE9-Trust-Economists.png",width = 10,height = 4,units = "in",dpi = 300)
+
+```

@@ -1,0 +1,58 @@
+---
+title: "Study 1 R Code - Figures"
+author: "Calvin Isch"
+date: "7/29/2023"
+output: html_document
+---
+
+```{r}
+library(ggplot2); library(dplyr); library(ggpubr); library(ggrepel);
+
+df <- read.csv('data/Study 1 R Data.csv')
+```
+
+
+## Figure 1 - Main text
+```{r}
+# Get a list of all the group names
+all_groups <- c()
+for (n in names(df %>% select(starts_with("slant_")))){
+  all_groups <- c(all_groups,substring(n,unlist(gregexpr('_', n))[1]+1))
+}
+
+# Report mean values for trust, slant, and politicization
+trust <- c()
+slant <- c()
+polit <- c()
+for (g in all_groups){
+  trust <- c(trust,mean(df[,paste("Trust_",g,sep='')],na.rm=TRUE))
+  slant <- c(slant,mean(df[,paste("slant_",g,sep='')],na.rm=TRUE))
+  polit <- c(polit,mean(df[,paste("polit_",g,sep='')],na.rm=TRUE))
+}
+df_means <- data.frame(all_groups,trust,slant,polit)
+
+# Order them by slant and add appropriate labels for the plot
+df_means <- df_means[order(df_means$slant),]
+all_group_labels <- c('Hollywood', 'PETA', 'Professors', 'WHO', 'Journalists', 'ASPCA', 'Psychologists', 'Librarians', 'K12 Teachers', 'Scientists', 'Facebook', 'United Nations', 'Physicists', 'Chefs', 'Pollsters', 'Veterinarians', 'Think Tanks', 'NFL', 'USPS', 'Tailors', 'Toll Workers', 'Congress', 'Doctors', 'Lawyers', 'CIA', 'Economists', 'Park Rangers', 'Dentists', 'Real Estate', 'MLB', 'Pharmaceutical', 'State Judges', 'Criminal Justice', 'Local Business', 'Firefighters', 'Mechanics', 'Banks', 'Supreme Court', 'Police', 'Catholic Church')
+df_means$nice_names <- all_group_labels
+df_means <- rename(df_means, Slant = slant)
+
+custom_palette <- colorRampPalette(c("blue", "#5A5A5A", "red"))
+
+# Plot and save the figure.
+ggplot(df_means, aes(x=polit, y = trust, col = Slant)) + 
+  geom_point(size = 0.5) + geom_smooth(method=glm, color='black',linetype=0) + 
+  geom_text_repel(aes(label = nice_names), box.padding = 0.2, size =2.25) +
+  ylab('Mean Org. Trust') + xlab('Mean Org. Politicization') + ggtitle('Study 1 (Trust)')+
+  theme(axis.text=element_text(size=10), 
+        axis.title=element_text(size=12), 
+        plot.title=element_text(size=15,hjust=0.5),
+        panel.background = element_rect(fill='white'),
+        legend.position = 'right',
+        plot.background = element_rect(fill='white', color=NA),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))+
+  coord_cartesian(xlim = c(1,6), ylim = c(1.5,5.0)) +
+  scale_color_gradientn(limits = c(20, 80), colors = custom_palette(100))
+
+ggsave("figures/Figure1-Mean-slant-polit-trust-study1.png",width = 4,height = 3.5,units = "in",dpi = 300)
+```

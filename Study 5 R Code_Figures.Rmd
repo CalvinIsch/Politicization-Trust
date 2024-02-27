@@ -1,0 +1,46 @@
+---
+title: "Study 5 R Code - Figures"
+author: "Calvin Isch"
+date: "7/29/2023"
+output: html_document
+---
+
+```{r}
+library(dplyr); library(ggplot2); library(tidyr)
+
+df <- read.csv('data/Study 5 R Data.csv')
+df <- df %>%
+  mutate(Condition = case_when(
+    Cond == -1 ~ "Depoliticization",
+    Cond == 0 ~ "Control",
+    Cond == 1 ~ "Democrat",
+    Cond == 2 ~ "Republican"
+  ))
+```
+
+## Figure 5 - Main Text
+
+```{r}
+plot_conditions <- function(data,outcome,include_y,ylab_use, include_x,xlab_use,include_legend){
+
+  a <- ggplot(data, aes(x=Ideology, y = get(outcome), color = Condition)) + 
+    geom_point(alpha = 0.5, size =0.5) + geom_jitter(height = 0.5,width = 0.5,alpha = 0.5, size =0.5) + geom_smooth(method=glm,aes(fill=Condition)) + 
+    ylim(0.5, 6.2) +
+    scale_color_manual(values=c('Control' = '#228B22','Depoliticization' = 'gold', 'Democrat' = '#0603C8','Republican' = "#990F02"),drop=FALSE)+
+    scale_fill_manual(values=c('Control' = '#228B22','Depoliticization' = 'gold', 'Democrat' = '#0603C8','Republican' = "#990F02"),drop=FALSE)+
+    ylab(ifelse(include_y, ylab_use, ""))  + 
+    xlab(ifelse(include_x,  xlab_use, "")) +
+    theme(axis.text=element_text(size=15), 
+          axis.title=element_text(size=15), 
+          axis.title.x=element_text(size=15),
+          legend.position = ifelse(include_legend,'right',"none"),
+          panel.background = element_rect(fill='white'),
+          plot.background = element_rect(fill='white', color=NA),
+          panel.border = element_rect(colour = "black", fill=NA, size=1))
+  return(a)
+}
+
+a1 <- plot_conditions(df,'Trust_EconPA',T,'Trust EconPA',T,'Ideology',T)
+
+ggsave("figures/Figure5-TrustEconPA.png",a1,width = 6,height = 3.5,units = "in",dpi = 300)
+```

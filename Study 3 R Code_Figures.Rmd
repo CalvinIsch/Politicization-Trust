@@ -1,0 +1,94 @@
+---
+title: "Study 3 R Code - Figures"
+author: "Calvin Isch"
+date: "7/29/2023"
+output: html_notebook
+---
+
+
+```{r}
+library(dplyr); library(ggplot2); library(ggpubr); library(grid); library(tidyr)
+
+colors <- c('Biden endorsement' = '#5499C7','No endorsement' = 'grey','Trump endorsement' = "#EC7063")
+
+df = read.csv('data/Study 3 R Data.csv')
+df <- df %>%
+    mutate(
+      Ideo_2 = Ideology - 4,
+      Condition = case_when(
+        is.na(RangCond) ~ NA_character_,
+        RangCond < 0 ~ "Biden endorsement",
+        RangCond > 0 ~ "Trump endorsement",
+        TRUE ~ "No endorsement"
+      )
+    ) %>%
+    mutate(Condition = factor(Condition, levels = c("Biden endorsement","No endorsement", "Trump endorsement")))
+```
+
+# Figure 2 - Main text
+``` {r}
+# Function to make individual regression plots
+plot_conditions <- function(data,outcome,include_y,ylab_use, include_x,xlab_use,include_legend){
+  a <- ggplot(data, aes(x=Ideology, y = get(outcome), color = Condition)) + 
+    geom_point(alpha = 0.5, size =0.5) + geom_jitter(height = 0.5,width = 0.5,alpha = 0.5, size =0.5) + geom_smooth(method=glm,aes(fill=Condition)) + 
+    ylim(0.5, 6.2) +
+    scale_color_manual(values=colors,drop=FALSE)+
+    scale_fill_manual(values=colors,drop=FALSE)+
+    ylab(ifelse(include_y, ylab_use, ""))  + 
+    xlab(ifelse(include_x,  xlab_use, "")) +
+    theme(axis.text=element_text(size=15), 
+          axis.title=element_text(size=15), 
+          axis.title.x=element_text(size=15),
+          legend.position = ifelse(include_legend,'right',"none"),
+          panel.background = element_rect(fill='white'),
+          plot.background = element_rect(fill='white', color=NA),
+          panel.border = element_rect(colour = "black", fill=NA, size=1))
+  return(a)
+}
+
+# Make unique subplots and arrange them together
+a1 <- plot_conditions(df,'TrustRang',T,'Trust Get Outdoors',F,'',F)
+a2 <- plot_conditions(df,'SupportRang',T,"Support Get Outdoors",F,"",F)
+b1 <- plot_conditions(df,'TrustAllRang',T,'Trust All Rangers',T,"Ideology",F)
+b2 <- plot_conditions(df,'SupportAllRang',T,'Support All Rangers',T,"Ideology",F)
+a <- ggarrange(a1, a2, b1, b2, labels = c("", "","",""),ncol = 2, nrow = 2, widths=c(1,1)) + bgcolor("White")
+a <- a + theme(plot.margin = margin(.8, .8, .8, .8, "cm"), panel.border = element_rect(color = "black",fill = NA,size = 1)) 
+
+# Function to create bar plots
+plot_votes <- function(df, org) {
+  data <- df
+  data <- data %>% mutate(Donate = as.numeric(Donate),
+              Vote = case_when(Vote == 1 ~ "Trump\nVoters", 
+                               Vote == 2 ~ "Biden\nVoters",
+                               Vote == 3 ~ 'Other/\nNeither'),
+              Donate = case_when(Donate == 1 ~ "Firefighters", 
+                               Donate == 2 ~ "Get Outdoors",
+                               Donate == 3 ~ 'Dentists')) %>%
+    mutate(Vote = factor(Vote, levels = c("Trump\nVoters","Biden\nVoters", "Other/\nNeither")))
+  data <- data %>% select(Condition, Vote, Donate) %>% drop_na()
+  data <- data %>% group_by(Vote, Condition, Donate) %>% summarise(Count_Donate = length(Donate))
+  data <- data %>% group_by(Vote, Condition) %>%
+    mutate(prop = Count_Donate / sum(Count_Donate)) %>% filter(Donate == org)
+  
+  plot_return <- ggplot(data, aes(fill= Condition, x = Vote, y = prop))+
+    geom_bar(position="dodge", stat="identity")+ 
+    scale_color_manual(values=colors,drop=FALSE)+
+    scale_fill_manual(values=colors,drop=FALSE)+
+    ylab('Proportion of donation votes') + xlab("") + ggtitle(paste("Votes to:",org)) + 
+    theme_bw() + 
+    theme(axis.text=element_text(size=15),
+          axis.title=element_text(size=18),
+          plot.title = element_text(size = 20, hjust = 0.5),
+          legend.title = element_text(size=18),
+          legend.text = element_text(size = 15),)
+  return(plot_return)
+}
+
+b <- plot_votes(df, "Get Outdoors")
+b <- ggarrange(b, labels = c('')) + bgcolor("White")
+b <- b + theme(plot.margin = margin(.8, .8, .8, .8, "cm"), panel.border = element_rect(color = "black",fill = NA,size = 1))
+
+ggarrange(a, b, labels = c("A", "B"),ncol = 2, nrow = 1, widths=c(1,1), font.label = list(size = 20)) + theme(plot.background = element_rect(fill = "white", color = NA))
+ggsave("figures/Figure2-Trust-Support-Get-Outdoors.png",width = 15,height = 6,units = "in",dpi = 300) 
+
+```
